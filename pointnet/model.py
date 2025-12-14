@@ -1,6 +1,10 @@
+import einx
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from beartype import beartype
+from jaxtyping import Float, jaxtyped
+from torch import Tensor
 from torch.autograd import Variable
 
 
@@ -36,14 +40,9 @@ class STNKd(nn.Module):
         x = torch.max(x, 2)[0]
 
         x = self.fc(x)
-        
+
         # Followed the original implementation to initialize a matrix as I.
-        identity = (
-            Variable(torch.eye(self.k, dtype=torch.float))
-            .reshape(1, self.k * self.k)
-            .expand(B, -1)
-            .to(device)
-        )
+        identity = Variable(torch.eye(self.k, dtype=torch.float)).reshape(1, self.k * self.k).expand(B, -1).to(device)
         x = x + identity
         x = x.reshape(-1, self.k, self.k)
         return x
@@ -53,6 +52,7 @@ class PointNetFeat(nn.Module):
     """
     Corresponds to the part that extracts max-pooled features.
     """
+
     def __init__(
         self,
         input_transform: bool = False,
@@ -68,9 +68,14 @@ class PointNetFeat(nn.Module):
             self.stn64 = STNKd(k=64)
 
         # point-wise mlp
-        # TODO : Implement point-wise mlp model based on PointNet Architecture.
+        # DONE_TODO : Implement point-wise mlp model based on PointNet Architecture.
+        self.mlp1 = nn.Sequential(nn.Conv1d(3, 64, 1), nn.BatchNorm1d(64), nn.ReLU())
+        self.mlp2 = nn.Sequential(nn.Conv1d(64, 128, 1), nn.BatchNorm1d(128), nn.ReLU())
+        self.mlp3 = nn.Sequential(nn.Conv1d(128, 1024, 1), nn.BatchNorm1d(1024), nn.ReLU())
 
-    def forward(self, pointcloud):
+    @jaxtyped
+    @beartype
+    def forward(self, pointcloud: Float[Tensor, "b n 3"]) -> Float[Tensor, "b 1024"]:
         """
         Input:
             - pointcloud: [B,N,3]
@@ -79,18 +84,32 @@ class PointNetFeat(nn.Module):
             - ...
         """
 
-        # TODO : Implement forward function.
-        pass
+        # DONE_TODO : Implement forward function.
+        x = einx.rearrange("b n c -> b c n", pointcloud, c=3)
+
+        if self.input_transform:
+            t3 = self.stn3(x)
+            x = einx.dot("b i j, b j n -> b i n", t3, x, i=3, j=3)
+
+        x = self.mlp1(x)
+
+        if self.feature_transform:
+            t64 = self.stn64(x)
+            x = einx.dot("b i j, b j n -> b i n", t64, x, i=64, j=64)
+
+        x = self.mlp3(self.mlp2(x))
+
+        return einx.reduce("b c n -> b c", x, "max", c=1024)
 
 
 class PointNetCls(nn.Module):
     def __init__(self, num_classes, input_transform, feature_transform):
         super().__init__()
         self.num_classes = num_classes
-        
+
         # extracts max-pooled features
         self.pointnet_feat = PointNetFeat(input_transform, feature_transform)
-        
+
         # returns the final logits from the max-pooled features.
         # TODO : Implement MLP that takes global feature as an input and return logits.
 
