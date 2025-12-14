@@ -1,29 +1,64 @@
-import torch
-import torch.nn.functional as F
 import argparse
 from datetime import datetime
-from tqdm import tqdm
-from model import PointNetAutoEncoder
-from dataloaders.modelnet import get_data_loaders
-from utils.metrics import Accuracy
-from utils.model_checkpoint import CheckpointManager
-from pytorch3d.loss.chamfer import chamfer_distance
 
- 
+# pytorch3d is non-trivial to install, so let us implement Chamfer distance by ourselves!
+# from pytorch3d.loss.chamfer import chamfer_distance
+import einx
+import torch
+from dataloaders.modelnet import get_data_loaders
+from jaxtyping import Float, jaxtyped
+from model import PointNetAutoEncoder
+from torch import Tensor
+from tqdm import tqdm
+from utils.model_checkpoint import CheckpointManager
+
+
+@jaxtyped
+def chamfer_distance(
+    x: Float[Tensor, "batch n d"],
+    y: Float[Tensor, "batch m d"],
+) -> Float[Tensor, ""]:
+    """
+    Symmetric Chamfer distance between two point clouds using squared L2 distance.
+
+    Args:
+        x: (B, N, D) point cloud
+        y: (B, M, D) point cloud
+
+    Returns:
+        Scalar Chamfer distance (mean over batch).
+    """
+
+    # (B, N, M, D): pairwise differences
+    diff = einx.subtract("b n d, b m d -> b n m d", x, y)
+
+    # (B, N, M): squared distances
+    dist = einx.sum("b n m d -> b n m", diff * diff)
+
+    # (B, N): for each point in x, nearest neighbor in y
+    min_xy = einx.min("b n m -> b n", dist)
+
+    # (B, M): for each point in y, nearest neighbor in x
+    min_yx = einx.min("b n m -> b m", dist)
+
+    # mean over points, then mean over batch
+    loss_per_batch = einx.mean("b n -> b", min_xy) + einx.mean("b m -> b", min_yx)
+    return loss_per_batch.mean()
+
 
 def step(points, model):
     """
-    Input : 
+    Input :
         - points [B, N, 3]
     Output : loss
         - loss []
         - preds [B, N, 3]
     """
 
-    # TODO : Implement step function for AutoEncoder. 
+    # TODO : Implement step function for AutoEncoder.
     # Hint : Use chamferDist defined in above
     # Hint : You can compute chamfer distance between two point cloud pc1 and pc2 by chamfer_distance(pc1, pc2)
-    
+
     preds = None
     loss = None
 
@@ -52,9 +87,7 @@ def main(args):
     model = model.to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(
-        optimizer, milestones=[30, 80], gamma=0.5
-    )
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[30, 80], gamma=0.5)
 
     # automatically save only topk checkpoints.
     if args.save:
@@ -71,7 +104,6 @@ def main(args):
     )
 
     for epoch in range(args.epochs):
-
         # training step
         model.train()
         pbar = tqdm(train_dl)
@@ -79,9 +111,7 @@ def main(args):
         for points, _ in pbar:
             train_batch_loss, train_batch_preds = train_step(points, model, optimizer)
             train_epoch_loss.append(train_batch_loss)
-            pbar.set_description(
-                f"{epoch+1}/{args.epochs} epoch | loss: {train_batch_loss:.4f}"
-            )
+            pbar.set_description(f"{epoch + 1}/{args.epochs} epoch | loss: {train_batch_loss:.4f}")
 
         train_epoch_loss = sum(train_epoch_loss) / len(train_epoch_loss)
 
@@ -94,12 +124,10 @@ def main(args):
                 val_epoch_loss.append(val_batch_loss)
 
             val_epoch_loss = sum(val_epoch_loss) / len(val_epoch_loss)
-            print(
-                f"train loss: {train_epoch_loss:.4f} | val loss: {val_epoch_loss:.4f}"
-            )
+            print(f"train loss: {train_epoch_loss:.4f} | val loss: {val_epoch_loss:.4f}")
 
         if args.save:
-            checkpoint_manager.update(model, epoch, round(val_epoch_loss.item(), 4), f"AutoEncoding_ckpt")
+            checkpoint_manager.update(model, epoch, round(val_epoch_loss.item(), 4), "AutoEncoding_ckpt")
 
         scheduler.step()
 
