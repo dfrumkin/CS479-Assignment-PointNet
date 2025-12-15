@@ -69,7 +69,6 @@ def main(args):
 
     wandb.init(
         project="cs479-assignment1-pointnet",
-        name="train",
         config=args,
     )
 
