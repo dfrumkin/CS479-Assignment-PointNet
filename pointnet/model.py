@@ -76,12 +76,15 @@ class PointNetFeat(nn.Module):
     @jaxtyped(typechecker=beartype)
     def forward(
         self, pointcloud: Float[Tensor, "b n 3"]
-    ) -> tuple[Float[Tensor, "b 1024"], Float[Tensor, "b 3 3"] | None, Float[Tensor, "b 64 64"] | None]:
+    ) -> tuple[
+        Float[Tensor, "b 1024"], Float[Tensor, "b 64 n"], Float[Tensor, "b 3 3"] | None, Float[Tensor, "b 64 64"] | None
+    ]:
         """Compute the global feature vector for the point cloud.
         Args:
             pointcloud (Float[Tensor, "b n 3"]): Point cloud with n points.
         Returns:
             Float[Tensor, "b 1024"]: Global feature.
+            Float[Tensor, "b 64 n"]: Feature.
             Float[Tensor, "b 3 3"] | None: Input transform if used.
             Float[Tensor, "b 64 64"] | None: Feature transform if used.
         """
@@ -102,11 +105,13 @@ class PointNetFeat(nn.Module):
         else:
             t64 = None
 
+        feature = x
+
         x = self.conv3(self.conv2(x))
 
-        feature = einx.max("b c n -> b c", x, c=1024)[0]
+        global_feature, _ = einx.max("b c n -> b c", x, c=1024)
 
-        return feature, t3, t64
+        return global_feature, feature, t3, t64
 
 
 class PointNetCls(nn.Module):
@@ -126,7 +131,7 @@ class PointNetCls(nn.Module):
             nn.Linear(512, 256),
             nn.BatchNorm1d(256),
             nn.ReLU(),
-            nn.Dropout(p=0.3),  # Should be configurable
+            nn.Dropout1d(p=0.3),  # Should be configurable
             nn.Linear(256, num_classes),
         )
 
@@ -134,7 +139,7 @@ class PointNetCls(nn.Module):
     def forward(
         self, pointcloud: Float[Tensor, "b n 3"]
     ) -> tuple[Float[Tensor, "b num_classes"], Float[Tensor, "b 3 3"] | None, Float[Tensor, "b 64 64"] | None]:
-        """Compute the logits for the point cloud.
+        """Compute the classification logits for the point cloud.
         Args:
             pointcloud (Float[Tensor, "b n 3"]): Point cloud with n points.
         Returns:
@@ -143,8 +148,8 @@ class PointNetCls(nn.Module):
             Float[Tensor, "b 64 64"] | None: Feature transform if used.
         """
         # DONE_TODO : Implement forward function.
-        feature, t3, t64 = self.pointnet_feat(pointcloud)
-        logits = self.fc(feature)
+        global_feature, _, t3, t64 = self.pointnet_feat(pointcloud)
+        logits = self.fc(global_feature)
         return logits, t3, t64
 
 
@@ -153,19 +158,40 @@ class PointNetPartSeg(nn.Module):
         super().__init__()
 
         # returns the logits for m part labels each point (m = # of parts = 50).
-        # TODO: Implement part segmentation model based on PointNet Architecture.
-        pass
+        # DONE_TODO: Implement part segmentation model based on PointNet Architecture.
+        self.m = m
+        self.feature_extr = PointNetFeat(True, False)
+        self.fc = nn.Sequential(
+            nn.Conv1d(1088, 512, 1),
+            nn.BatchNorm1d(512),
+            nn.ReLU(),
+            nn.Conv1d(512, 256, 1),
+            nn.BatchNorm1d(256),
+            nn.ReLU(),
+            nn.Conv1d(256, 128, 1),
+            nn.BatchNorm1d(128),
+            nn.ReLU(),
+            nn.Dropout1d(p=0.3),  # Should be configurable
+            nn.Conv1d(128, m, 1),
+        )
 
-    def forward(self, pointcloud):
+    @jaxtyped(typechecker=beartype)
+    def forward(
+        self, pointcloud: Float[Tensor, "b n 3"]
+    ) -> tuple[Float[Tensor, "b m n"], Float[Tensor, "b 3 3"] | None, Float[Tensor, "b 64 64"] | None]:
+        """Compute the segmentation logits for the point cloud.
+        Args:
+            pointcloud (Float[Tensor, "b n 3"]): Point cloud with n points.
+        Returns:
+            Float[Tensor, "b m n"]: Logits.
+            Float[Tensor, "b 3 3"] | None: Input transform if used.
+            Float[Tensor, "b 64 64"] | None: Feature transform if used.
         """
-        Input:
-            - pointcloud: [B,N,3]
-        Output:
-            - logits: [B,50,N] | 50: # of point labels
-            - ...
-        """
-        # TODO: Implement forward function.
-        pass
+        # DONE_TODO: Implement forward function.
+        global_feature, feature, t3, t64 = self.feature_extr(pointcloud)
+        x = einx.rearrange("b c1 n, b c2 -> b (c1 + c2) n", feature, global_feature, c1=64, c2=1024)
+        logits = self.fc(x)
+        return logits, t3, t64
 
 
 class PointNetAutoEncoder(nn.Module):
