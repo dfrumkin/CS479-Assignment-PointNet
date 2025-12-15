@@ -4,8 +4,6 @@ pointnet/checkpoints/auto_encoding/**
 pointnet/checkpoints/segmentation/**
 !**/.gitkeep
 
-.vscode/
-
 __pycache__/
 *.py[cod]
 *$py.class
