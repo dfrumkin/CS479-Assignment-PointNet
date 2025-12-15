@@ -4,6 +4,43 @@
   </h1>
   <p>
     <a href=https://mhsung.github.io/kaist-cs479-spring-2025/ target="_blank"><b>KAIST CS479: Machine Learning for 3D Data</b></a><br>
+    Programming Assignment 1 - Solution
+  </p>
+</div>
+
+This is Dmitry's take on the PointNet assignment.
+
+## Changes to the Code
+
+In addition to the **TODO** sections (renamed **DONE_TODO**), I also had to introduce minor changes in other places, so technically cannot submit it for grade.
+
+- I use a modern version of python (1.13) and pytorch.  The environment is managed by uv configured in pyproject.toml.
+- The dependency on pytorch3d was problematic, but it was only for chamfer_distance, so I just added code
+for the function.
+- I used ruff for linting and automatic code formatting.
+- I used jaxtyping and beartype for type annotations, in addition to einx that I like for clarity.
+- I used wandb to track experiments.
+- I changed the device definition to be able to run using Macbook's MPS for debugging.  For actual training I used an A-100
+instance on lambda.ai.
+
+## Classification
+
+- <a href=https://wandb.ai/dmitry-frumkin-personal/cs479-assignment1-pointnet/runs/1wud00sg target="_blank">88% w/ feature trans.</a>
+- <a href=https://wandb.ai/dmitry-frumkin-personal/cs479-assignment1-pointnet/runs/88q0mozi target="_blank">88.1% w/o feature trans.</a>
+
+Obviously, the results are not ideal.  It would certainly help
+to calibrate hyperparameters to get better results.
+The very fact that feature transformation, a important ingredient of the original paper, does more harm than good implies that
+the architecture is far from ideal.
+
+Below is the original README.
+
+<div align=center>
+  <h1>
+    PointNet: Point Cloud Processing Network
+  </h1>
+  <p>
+    <a href=https://mhsung.github.io/kaist-cs479-spring-2025/ target="_blank"><b>KAIST CS479: Machine Learning for 3D Data</b></a><br>
     Programming Assignment 1    
   </p>
 </div>
