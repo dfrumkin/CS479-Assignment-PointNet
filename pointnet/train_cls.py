@@ -73,10 +73,6 @@ def main(args):
         config=args,
     )
 
-    wandb.define_metric("epoch")
-    wandb.define_metric("loss/*", step_metric="epoch")
-    wandb.define_metric("acc/*", step_metric="epoch")
-
     model = PointNetCls(num_classes=40, input_transform=True, feature_transform=True)
     model = model.to(device)
 
