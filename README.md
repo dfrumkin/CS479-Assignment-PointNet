@@ -12,11 +12,10 @@ This is Dmitry's take on the PointNet assignment.
 
 ## Changes to the Code
 
-In addition to the **TODO** sections (renamed **DONE_TODO**), I also had to introduce minor changes in other places, so technically cannot submit it for grade.
+In addition to the **TODO** sections (renamed **DONE_TODO**), I also had to introduce minimal changes in other places, so technically cannot submit it for a grade.
 
-- I use a modern version of python (1.13) and pytorch.  The environment is managed by uv configured in pyproject.toml.
-- The dependency on pytorch3d was problematic, but it was only for chamfer_distance, so I just added code
-for the function.
+- I used a modern version of python (3.13) and pytorch (2.9).  The environment is managed by uv configured in pyproject.toml.
+- With modern python/pytorch, the dependency on pytorch3d was problematic.  Since it was needed only for chamfer_distance, I just added code for the function and dropped the dependency.
 - I used ruff for linting and automatic code formatting.
 - I used jaxtyping and beartype for type annotations, in addition to einx that I like for clarity.
 - I used wandb to track experiments.
@@ -29,7 +28,7 @@ instance on lambda.ai.
 - <a href=https://wandb.ai/dmitry-frumkin-personal/cs479-assignment1-pointnet/runs/88q0mozi target="_blank">88.1% w/o feature trans.</a>
 
 Obviously, the results are not ideal.  It would certainly help
-to calibrate hyperparameters to get better results.
+to calibrate hyperparameters to get better results.  I did not spend time on this.
 The very fact that feature transformation, a important ingredient of the original paper, does more harm than good implies that
 the architecture is far from ideal.
 
