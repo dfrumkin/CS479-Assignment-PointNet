@@ -69,37 +69,44 @@ class PointNetFeat(nn.Module):
 
         # point-wise mlp
         # DONE_TODO : Implement point-wise mlp model based on PointNet Architecture.
-        self.mlp1 = nn.Sequential(nn.Conv1d(3, 64, 1), nn.BatchNorm1d(64), nn.ReLU())
-        self.mlp2 = nn.Sequential(nn.Conv1d(64, 128, 1), nn.BatchNorm1d(128), nn.ReLU())
-        self.mlp3 = nn.Sequential(nn.Conv1d(128, 1024, 1), nn.BatchNorm1d(1024), nn.ReLU())
+        self.conv1 = nn.Sequential(nn.Conv1d(3, 64, 1), nn.BatchNorm1d(64), nn.ReLU())
+        self.conv2 = nn.Sequential(nn.Conv1d(64, 128, 1), nn.BatchNorm1d(128), nn.ReLU())
+        self.conv3 = nn.Sequential(nn.Conv1d(128, 1024, 1), nn.BatchNorm1d(1024), nn.ReLU())
 
-    @jaxtyped
-    @beartype
-    def forward(self, pointcloud: Float[Tensor, "b n 3"]) -> Float[Tensor, "b 1024"]:
+    @jaxtyped(typechecker=beartype)
+    def forward(
+        self, pointcloud: Float[Tensor, "b n 3"]
+    ) -> tuple[Float[Tensor, "b 1024"], Float[Tensor, "b 3 3"] | None, Float[Tensor, "b 64 64"] | None]:
+        """Compute the global feature vector for the point cloud.
+        Args:
+            pointcloud (Float[Tensor, "b n 3"]): Point cloud with n points.
+        Returns:
+            Float[Tensor, "b 1024"]: Global feature.
+            Float[Tensor, "b 3 3"] | None: Input transform if used.
+            Float[Tensor, "b 64 64"] | None: Feature transform if used.
         """
-        Input:
-            - pointcloud: [B,N,3]
-        Output:
-            - Global feature: [B,1024]
-            - ...
-        """
-
         # DONE_TODO : Implement forward function.
         x = einx.rearrange("b n c -> b c n", pointcloud, c=3)
 
         if self.input_transform:
             t3 = self.stn3(x)
             x = einx.dot("b i j, b j n -> b i n", t3, x, i=3, j=3)
+        else:
+            t3 = None
 
-        x = self.mlp1(x)
+        x = self.conv1(x)
 
         if self.feature_transform:
             t64 = self.stn64(x)
             x = einx.dot("b i j, b j n -> b i n", t64, x, i=64, j=64)
+        else:
+            t64 = None
 
-        x = self.mlp3(self.mlp2(x))
+        x = self.conv3(self.conv2(x))
 
-        return einx.reduce("b c n -> b c", x, "max", c=1024)
+        feature = einx.max("b c n -> b c", x, c=1024)[0]
+
+        return feature, t3, t64
 
 
 class PointNetCls(nn.Module):
@@ -111,18 +118,34 @@ class PointNetCls(nn.Module):
         self.pointnet_feat = PointNetFeat(input_transform, feature_transform)
 
         # returns the final logits from the max-pooled features.
-        # TODO : Implement MLP that takes global feature as an input and return logits.
+        # DONE_TODO : Implement MLP that takes global feature as an input and return logits.
+        self.fc = nn.Sequential(
+            nn.Linear(1024, 512),
+            nn.BatchNorm1d(512),
+            nn.ReLU(),
+            nn.Linear(512, 256),
+            nn.BatchNorm1d(256),
+            nn.ReLU(),
+            nn.Dropout(p=0.3),  # Should be configurable
+            nn.Linear(256, num_classes),
+        )
 
-    def forward(self, pointcloud):
+    @jaxtyped(typechecker=beartype)
+    def forward(
+        self, pointcloud: Float[Tensor, "b n 3"]
+    ) -> tuple[Float[Tensor, "b num_classes"], Float[Tensor, "b 3 3"] | None, Float[Tensor, "b 64 64"] | None]:
+        """Compute the logits for the point cloud.
+        Args:
+            pointcloud (Float[Tensor, "b n 3"]): Point cloud with n points.
+        Returns:
+            Float[Tensor, "b num_classes"]: Logits.
+            Float[Tensor, "b 3 3"] | None: Input transform if used.
+            Float[Tensor, "b 64 64"] | None: Feature transform if used.
         """
-        Input:
-            - pointcloud [B,N,3]
-        Output:
-            - logits [B,num_classes]
-            - ...
-        """
-        # TODO : Implement forward function.
-        pass
+        # DONE_TODO : Implement forward function.
+        feature, t3, t64 = self.pointnet_feat(pointcloud)
+        logits = self.fc(feature)
+        return logits, t3, t64
 
 
 class PointNetPartSeg(nn.Module):
