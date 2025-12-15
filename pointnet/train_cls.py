@@ -56,7 +56,7 @@ def main(args):
     # DF: Modified to train on a Macbook
     # device = "cpu" if args.gpu == -1 else f"cuda:{args.gpu}"
     device = torch.device(
-        "cuda:{args.gpu}"
+        f"cuda:{args.gpu}"
         if torch.cuda.is_available() and args.gpu >= 0
         else "mps"
         if torch.backends.mps.is_available()
