@@ -30,10 +30,19 @@ For actual training I used an A-100 instance on lambda.ai.
 
 ## Task 2. Point Cloud Part Segmentation
 
-<a href=https://wandb.ai/dmitry-frumkin-personal/cs479-assignment1-pointnet/runs/u8ar2agb target="_blank">82.4% ins. mIOU.</a>
+<a href=https://wandb.ai/dmitry-frumkin-personal/cs479-assignment1-pointnet/runs/88zvck7q target="_blank">82.4% ins. mIOU.</a>
 
 ## Task 3. Point Cloud Auto-Encoding
 
+**Important:** To avoid pytorch3d, I used my own implementation of Chamfer distance that should be equivalent to theirs:
+- bi-directional
+- squared L2
+- mean over points
+- mean over batch
+
+<a href=https://wandb.ai/dmitry-frumkin-personal/cs479-assignment1-pointnet/runs/j44coxxy target="_blank">Chamfer Dist. 0.0032.</a>
+
+All in all, a good exercise.  Just do not submit this solution for a grade: you will get 0.
 
 Below is the original README.
 
