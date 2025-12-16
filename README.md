@@ -40,7 +40,7 @@ For actual training I used an A-100 instance on lambda.ai.
 - mean over points
 - mean over batch
 
-<a href=https://wandb.ai/dmitry-frumkin-personal/cs479-assignment1-pointnet/runs/j44coxxy target="_blank">Chamfer Dist. 0.0032.</a>
+<a href=https://wandb.ai/dmitry-frumkin-personal/cs479-assignment1-pointnet/runs/j44coxxy target="_blank">0.0032 Chamfer dist.</a>
 
 All in all, a good exercise.  Just do not submit this solution for a grade: you will get 0.
 
