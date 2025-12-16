@@ -12,25 +12,28 @@ This is Dmitry's take on the PointNet assignment.
 
 ## Changes to the Code
 
-In addition to the **TODO** sections (renamed **DONE_TODO**), I also had to introduce minimal changes in other places, so technically cannot submit it for a grade.
+In addition to the **TODO** sections (renamed **DONE_TODO**), I also had to introduce **minimal** changes in other places, so technically cannot submit it for a grade :(.
 
 - I used a modern version of python (3.13) and pytorch (2.9).  The environment is managed by uv configured in pyproject.toml.
 - With modern python/pytorch, the dependency on pytorch3d was problematic.  Since it was needed only for chamfer_distance, I just added code for the function and dropped the dependency.
 - I used ruff for linting and automatic code formatting.
 - I used jaxtyping and beartype for type annotations, in addition to einx that I like for clarity.
 - I used wandb to track experiments.
-- I changed the device definition to be able to run using Macbook's MPS for debugging.  For actual training I used an A-100
-instance on lambda.ai.
+- I changed the device definition to be able to run using Macbook's MPS for debugging.  Also, I added a line to move training data to the device (for some reason this was done for validation, but not for training data).
 
-## Classification
+For actual training I used an A-100 instance on lambda.ai.
 
-- <a href=https://wandb.ai/dmitry-frumkin-personal/cs479-assignment1-pointnet/runs/1wud00sg target="_blank">88% w/ feature trans.</a>
-- <a href=https://wandb.ai/dmitry-frumkin-personal/cs479-assignment1-pointnet/runs/88q0mozi target="_blank">88.1% w/o feature trans.</a>
+## Task 1. Point Cloud Classification
 
-Obviously, the results are not ideal.  It would certainly help
-to calibrate hyperparameters to get better results.  I did not spend time on this.
-The very fact that feature transformation, a important ingredient of the original paper, does more harm than good implies that
-the architecture is far from ideal.
+- <a href=https://wandb.ai/dmitry-frumkin-personal/cs479-assignment1-pointnet/runs/hlu9m2gs target="_blank">88.5% w/ feature trans.</a>
+- <a href=https://wandb.ai/dmitry-frumkin-personal/cs479-assignment1-pointnet/runs/adthzx78 target="_blank">88.7% w/o feature trans.</a>
+
+## Task 2. Point Cloud Part Segmentation
+
+<a href=https://wandb.ai/dmitry-frumkin-personal/cs479-assignment1-pointnet/runs/u8ar2agb target="_blank">82.4% ins. mIOU.</a>
+
+## Task 3. Point Cloud Auto-Encoding
+
 
 Below is the original README.
 

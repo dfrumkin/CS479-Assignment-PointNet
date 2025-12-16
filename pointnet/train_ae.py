@@ -5,6 +5,8 @@ from datetime import datetime
 # from pytorch3d.loss.chamfer import chamfer_distance
 import einx
 import torch
+import wandb
+from beartype import beartype
 from dataloaders.modelnet import get_data_loaders
 from jaxtyping import Float, jaxtyped
 from model import PointNetAutoEncoder
@@ -13,10 +15,10 @@ from tqdm import tqdm
 from utils.model_checkpoint import CheckpointManager
 
 
-@jaxtyped
+@jaxtyped(typechecker=beartype)
 def chamfer_distance(
-    x: Float[Tensor, "batch n d"],
-    y: Float[Tensor, "batch m d"],
+    x: Float[Tensor, "b n d"],
+    y: Float[Tensor, "b m d"],
 ) -> Float[Tensor, ""]:
     """
     Symmetric Chamfer distance between two point clouds using squared L2 distance.
@@ -29,17 +31,18 @@ def chamfer_distance(
         Scalar Chamfer distance (mean over batch).
     """
 
-    # (B, N, M, D): pairwise differences
-    diff = einx.subtract("b n d, b m d -> b n m d", x, y)
+    # Compute ||x - y||^2 = ||x||^2 + ||y||^2 - 2 x·y without materializing (b, n, m, d).
+    x2 = einx.sum("b n d -> b n 1", x * x)
+    y2 = einx.sum("b m d -> b 1 m", y * y)
+    xy = einx.dot("b n d, b m d -> b n m", x, y)
 
-    # (B, N, M): squared distances
-    dist = einx.sum("b n m d -> b n m", diff * diff)
+    dist = (x2 + y2 - 2.0 * xy).clamp_min(0.0)
 
     # (B, N): for each point in x, nearest neighbor in y
-    min_xy = einx.min("b n m -> b n", dist)
+    min_xy, _ = einx.min("b n m -> b n", dist)
 
     # (B, M): for each point in y, nearest neighbor in x
-    min_yx = einx.min("b n m -> b m", dist)
+    min_yx, _ = einx.min("b n m -> b m", dist)
 
     # mean over points, then mean over batch
     loss_per_batch = einx.mean("b n -> b", min_xy) + einx.mean("b m -> b", min_yx)
@@ -55,12 +58,13 @@ def step(points, model):
         - preds [B, N, 3]
     """
 
-    # TODO : Implement step function for AutoEncoder.
+    # DONE_TODO : Implement step function for AutoEncoder.
     # Hint : Use chamferDist defined in above
     # Hint : You can compute chamfer distance between two point cloud pc1 and pc2 by chamfer_distance(pc1, pc2)
 
-    preds = None
-    loss = None
+    points = points.to(device)
+    _, preds = model(points)
+    loss = chamfer_distance(preds, points)
 
     return loss, preds
 
@@ -68,7 +72,10 @@ def step(points, model):
 def train_step(points, model, optimizer):
     loss, preds = step(points, model)
 
-    # TODO : Implement backpropagation using optimizer and loss
+    # DONE_TODO : Implement backpropagation using optimizer and loss
+    optimizer.zero_grad(set_to_none=True)
+    loss.backward()
+    optimizer.step()
 
     return loss, preds
 
@@ -81,7 +88,24 @@ def validation_step(points, model):
 
 def main(args):
     global device
-    device = "cpu" if args.gpu == -1 else f"cuda:{args.gpu}"
+    # DF: Modified to train on a Macbook
+    # device = "cpu" if args.gpu == -1 else f"cuda:{args.gpu}"
+    device = torch.device(
+        f"cuda:{args.gpu}"
+        if torch.cuda.is_available() and args.gpu >= 0
+        else "mps"
+        if torch.backends.mps.is_available()
+        else "cpu"
+    )
+
+    # DF: Added for W&B tracking
+    # Log in to WnB using WANDB_API_KEY or ~/.netrc
+    wandb.login()
+
+    wandb.init(
+        project="cs479-assignment1-pointnet",
+        config=args,
+    )
 
     model = PointNetAutoEncoder(num_points=2048)
     model = model.to(device)
@@ -130,6 +154,16 @@ def main(args):
             checkpoint_manager.update(model, epoch, round(val_epoch_loss.item(), 4), "AutoEncoding_ckpt")
 
         scheduler.step()
+
+        # DF: Added logging to W&B
+        wandb.log(
+            {
+                "loss/train": train_epoch_loss,
+                "loss/val": val_epoch_loss,
+                "lr": optimizer.param_groups[0]["lr"],
+            },
+            step=epoch,
+        )
 
     if args.save:
         checkpoint_manager.load_best_ckpt(model, device)

@@ -200,18 +200,39 @@ class PointNetAutoEncoder(nn.Module):
         self.pointnet_feat = PointNetFeat()
 
         # Decoder is just a simple MLP that outputs N x 3 (x,y,z) coordinates.
-        # TODO : Implement decoder.
+        # DONE_TODO : Implement decoder.
+        self.num_points = num_points
+        l1 = num_points // 4
+        l2 = num_points // 2
+        l3 = num_points
+        l4 = num_points * 3
+        self.fc = nn.Sequential(
+            nn.Linear(1024, l1),
+            nn.BatchNorm1d(l1),
+            nn.ReLU(),
+            nn.Linear(l1, l2),
+            nn.BatchNorm1d(l2),
+            nn.ReLU(),
+            nn.Linear(l2, l3),
+            nn.BatchNorm1d(l3),
+            nn.ReLU(),
+            nn.Dropout(p=0.3),  # Should be configurable
+            nn.Linear(l3, l4),
+        )
 
-    def forward(self, pointcloud):
+    @jaxtyped(typechecker=beartype)
+    def forward(self, pointcloud: Float[Tensor, "b n 3"]) -> tuple[Float[Tensor, "b 1024"], Float[Tensor, "b n 3"]]:
+        """Compute an encoding and a reconstructed decoding of a point cloud.
+        Args:
+            pointcloud (Float[Tensor, "b n 3"]): Point cloud with n points.
+        Returns:
+            Float[Tensor, "b 1024"]: encoding.
+            Float[Tensor, "b n 3"]: decoding.
         """
-        Input:
-            - pointcloud [B,N,3]
-        Output:
-            - pointcloud [B,N,3]
-            - ...
-        """
-        # TODO : Implement forward function.
-        pass
+        # DONE_TODO : Implement forward function.
+        encoding, _, _, _ = self.pointnet_feat(pointcloud)
+        decoding: Float[Tensor, "b n 3"] = einx.rearrange("b (n c) -> b n c", self.fc(encoding), n=self.num_points, c=3)  # type: ignore
+        return encoding, decoding
 
 
 def get_orthogonal_loss(feat_trans, reg_weight=1e-3):
